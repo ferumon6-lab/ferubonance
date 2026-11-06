@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+  <meta name="theme-color" content="#0b0b0e">
+  <title>Mis Finanzas</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <button class="icon-btn settings-btn" id="btnSettings" aria-label="Ajustes">⚙</button>
+    <div class="summary" id="summary"></div>
+    <div class="cur-switch" id="curSwitch"></div>
+  </header>
+
+  <main>
+    <!-- ===== MES: editor + historial ===== -->
+    <section class="view active" id="view-mes">
+      <section class="block mini" data-collapse-id="ritmo">
+        <div class="block-head">
+          <h3 class="block-title sm">📈 Ritmo del mes</h3>
+          <button class="icon-btn" data-chart-size="1" title="Agrandar o achicar los gráficos" aria-label="Agrandar gráficos">⤢</button>
+        </div>
+        <div id="paceChart"></div>
+      </section>
+      <h1 class="mes-title" id="monthTitle" title="Ver otros meses">—</h1>
+      <div class="calendar" id="calendar" hidden></div>
+      <div class="past-bar" id="pastBar"></div>
+      <div class="hl-wrap">
+        <div class="hl-backdrop" id="hlMes" aria-hidden="true"></div>
+        <textarea id="editor" spellcheck="false" placeholder="Escribe un párrafo por movimiento…&#10;&#10;Ej: «Pinceles», toca Gasto → PEN → escribe 50 → toca la cuenta.&#10;Queda así: Pinceles -PEN50B"></textarea>
+      </div>
+      <div class="toolbar" id="toolbar"></div>
+      <div class="suggest" id="suggest"></div>
+      <div class="hint" id="hint"></div>
+
+      <div class="reminders" id="reminders"></div>
+
+      <section class="block" data-collapse-id="historial">
+        <h3 class="block-title">Historial <span class="sec-total">toca el nombre del mes para ver otros</span></h3>
+        <div id="splits"></div>
+      </section>
+      <section class="block" data-collapse-id="dinero">
+        <h3 class="block-title">🔎 ¿En qué se va tu dinero?</h3>
+        <div id="topSpend"></div>
+      </section>
+    </section>
+
+    <!-- ===== COMPROMISOS: fijos + deudas + encargos ===== -->
+    <section class="view" id="view-compromisos">
+      <section class="block" data-collapse-id="mensual">
+        <h2 class="block-title">Mensual <span class="sec-total" id="totalFijos"></span></h2>
+        <p class="help small">Gastos e ingresos que se repiten cada mes (suscripciones, alquiler, sueldo…). Elige en la lista a qué cuenta entra o de cuál sale.</p>
+        <div class="hl-wrap">
+          <div class="hl-backdrop" id="hlFijos" aria-hidden="true"></div>
+          <textarea id="editorFijos" class="short" spellcheck="false" placeholder="Internet -PEN80B @15 Au&#10;Agua -PEN40B @20 Ma&#10;Sueldo +PEN2500B @30 Au"></textarea>
+        </div>
+        <p class="help small"><b>@15</b> = día en que se cobra. <b>Au</b> = automático (se descuenta solo). <b>Ma</b> = manual: lo marcas como pagado, o se marca solo si en el Mes escribes un gasto con el mismo nombre (sin importar mayúsculas, tildes, puntos ni espacios de más).</p>
+        <ul class="entries" id="listFijos"></ul>
+      </section>
+
+      <section class="block" data-collapse-id="deudas">
+        <h2 class="block-title">Deudas</h2>
+        <h3 class="sec-title t-deuda-text">Yo debo <span class="sec-total" id="totDebo"></span></h3>
+        <ul class="entries" id="listDebo"></ul>
+        <h3 class="sec-title t-medeben-text">Me deben <span class="sec-total" id="totMeDeben"></span></h3>
+        <ul class="entries" id="listMeDeben"></ul>
+        <details class="done-block">
+          <summary>Deudas saldadas</summary>
+          <ul class="entries" id="listDone"></ul>
+        </details>
+      </section>
+
+      <section class="block" data-collapse-id="encargos">
+        <h2 class="block-title">Encargos</h2>
+        <h3 class="sec-title t-encargo-text">Pendientes <span class="sec-total" id="totEncargos"></span></h3>
+        <p class="help small">Al marcarlo cumplido te pregunta cuánto llegó. Lo que se quede la plataforma cuenta como comisión.</p>
+        <ul class="entries" id="listEncargos"></ul>
+        <h3 class="sec-title t-encargo-text">Cumplidos · ruta del dinero</h3>
+        <p class="help small">Toca <b>Mover →</b> para pasar el dinero a otra cuenta. Las transferencias con el mismo nombre del encargo forman su ruta.</p>
+        <ul class="entries" id="listEncargosDone"></ul>
+      </section>
+
+      <section class="block" id="caminoBlock" data-collapse-id="camino" hidden>
+        <h2 class="block-title">Transferencias en camino <span class="sec-total" id="totCamino"></span></h2>
+        <p class="help small">Toca <b>Llegó…</b> cuando el dinero llegue a la otra cuenta.</p>
+        <ul class="entries" id="listCamino"></ul>
+      </section>
+    </section>
+
+    <!-- ===== BANCOS (con PIN) ===== -->
+    <section class="view" id="view-bancos">
+      <div id="bankContent">
+        <h2 class="view-title">Balance bancario hipotético</h2>
+        <p class="help">Lo que <b>deberías</b> tener según lo que anotas. Escribe el saldo real de tu estado de cuenta y la app te dice si falta o sobra dinero.</p>
+
+        <!-- El PIN solo protege las notas -->
+        <div class="notes-lock" id="bankLock">
+          <div class="notes-lock-row" id="lockedRow">
+            <span id="lockMsg">🔒 Notas bloqueadas</span>
+            <input type="password" inputmode="numeric" autocomplete="off" maxlength="12" id="pinInput" placeholder="PIN">
+            <input type="password" inputmode="numeric" autocomplete="off" maxlength="12" id="pinInput2" placeholder="Repite" hidden>
+            <button class="primary" id="btnUnlock">Ver notas</button>
+          </div>
+          <div class="notes-lock-row" id="unlockedRow" hidden>
+            <span>🔓 Notas visibles</span>
+            <button class="small" id="btnLock">Bloquear</button>
+          </div>
+        </div>
+        <div id="bankTotal"></div>
+      <div id="bankChart"></div>
+        <div id="accountsList"></div>
+
+        <div class="card">
+          <h3>Nueva cuenta</h3>
+          <div class="row-prefix">
+            <label>Nombre <input type="text" id="accName" placeholder="BCP, Interbank, Efectivo…"></label>
+            <label>Prefijo <input type="text" id="accPrefix" maxlength="2" placeholder="Bc"></label>
+          </div>
+          <div class="row2">
+            <label>Saldo actual <input type="number" step="0.01" id="accInitial" placeholder="0.00"></label>
+            <label>Moneda <select id="accCurrency"></select></label>
+          </div>
+          <label>Color</label>
+          <div class="swatches" id="accSwatches"></div>
+          <button id="btnAddAccount" class="primary">Agregar cuenta</button>
+        </div>
+
+        <div class="card">
+          <label>Cuenta cuando no pones prefijo
+            <select id="setDefaultAccount"></select>
+          </label>
+          <p class="help small">Los gastos fijos con cuenta se descuentan a partir del mes siguiente a crearla.</p>
+        </div>
+
+        <div class="card" id="changePinCard" hidden>
+          <h3>Cambiar PIN de las notas</h3>
+          <div class="row2">
+            <input type="password" inputmode="numeric" maxlength="12" id="newPin" placeholder="PIN nuevo">
+            <input type="password" inputmode="numeric" maxlength="12" id="newPin2" placeholder="Repítelo">
+          </div>
+          <button id="btnChangePin">Guardar PIN</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== METAS ===== -->
+    <section class="view" id="view-metas">
+      <section>
+        <h2 class="view-title">🎯 Metas</h2>
+        <p class="help">Tu progreso se mide con tu dinero total (el balance hipotético de Bancos). La meta se completa cuando ya tienes el monto.</p>
+        <p class="help small">Opcional: pon qué <b>% de tu dinero</b> debería ser la meta. Ej: viaje de USD 5,000 al 25% → para ★★★ necesitas USD 20,000 en total. ★ tienes el monto · ★★ es como máximo el doble de ese % · ★★★ es como máximo ese %.</p>
+        <div id="goalsList"></div>
+        <div id="projGoalsList"></div>
+        <div class="card">
+          <h3>Nueva meta</h3>
+          <label>Nombre <input type="text" id="goalName" placeholder="Laptop nueva, viaje, tableta…"></label>
+          <div class="row2">
+            <label>Monto objetivo <input type="number" step="0.01" id="goalTarget" placeholder="0.00"></label>
+            <label>Moneda <select id="goalCurrency"></select></label>
+          </div>
+          <div class="row2">
+            <label>Fecha límite <input type="date" id="goalDate"></label>
+            <label>% máx. de tu dinero <input type="number" step="1" min="1" max="100" id="goalPct" placeholder="Opcional"></label>
+          </div>
+          <button id="btnAddGoal" class="primary">Agregar meta</button>
+        </div>
+      </section>
+    </section>
+
+    <!-- ===== PROYECTOS ===== -->
+    <section class="view" id="view-proyectos">
+      <h2 class="view-title">🧾 Proyectos</h2>
+      <p class="help">Presupuesto de tus proyectos personales. Escribe sus partidas, una por párrafo:</p>
+      <ul class="help small proj-help">
+        <li><b>ArteProyecto 600USD</b> → la puedes pagar de a pocos. Cuenta todo gasto en el Mes con ese mismo nombre (ej. <b>ArteProyecto -USD40Py</b>).</li>
+        <li><b>Marketing 200-400USD</b> → rango, si no sabes cuánto costará.</li>
+        <li><b>Claude -PEN70Bc @4 Au</b> → mensual: se cobra como gasto fijo mientras el proyecto esté activo.</li>
+      </ul>
+      <div id="projectsList"></div>
+      <div class="card">
+        <h3>Nuevo proyecto</h3>
+        <label>Nombre <input type="text" id="projName" placeholder="Proyecto Juego, Exposición, Web…"></label>
+        <label>Partidas (una por párrafo)
+          <textarea id="projText" rows="4" spellcheck="false" placeholder="Arte 6000USD&#10;Música 500USD&#10;Licencia Steam 100USD"></textarea>
+        </label>
+        <div class="row3">
+          <label>Moneda <select id="projCurrency"></select></label>
+          <label>Duración (meses) <input type="number" min="0" id="projMonths" placeholder="0"></label>
+          <label>y días <input type="number" min="0" id="projDays" placeholder="0"></label>
+        </div>
+        <label class="chk-label" style="margin:10px 0"><input type="checkbox" id="projIsGoal"> Es una meta (con estrellas, como en Metas)</label>
+        <p class="help small">Después puedes cambiar la fecha de inicio o usar una fecha final en lugar de la duración (útil para deudas grandes o un departamento).</p>
+        <button id="btnAddProject" class="primary">Crear proyecto</button>
+      </div>
+    </section>
+
+    <!-- ===== MONEDAS ===== -->
+    <section class="view" id="view-monedas">
+      <h2 class="view-title">Monedas</h2>
+      <h3 class="sec-title" style="margin-top:6px">¿Tu dinero perdió valor?</h3>
+      <p class="help small">Lo que vale hoy el saldo de cada cuenta comparado con lo que valía ese mismo saldo antes (según el rango elegido más abajo).</p>
+      <div id="fxAccounts"></div>
+      <div class="card conv">
+        <h3>Calculadora de monedas</h3>
+        <div class="conv-row">
+          <input type="text" id="calcInput" value="100 USD" autocomplete="off" spellcheck="false" placeholder="Ej: 15000JPY - 500USD">
+          <span class="conv-a">a</span>
+          <select id="calcTo"></select>
+        </div>
+        <div id="convResult"></div>
+        <div class="calc-examples" id="calcExamples">
+          <button data-calc="100 USD a PEN">100 USD a PEN</button>
+          <button data-calc="15000JPY - 500USD a PEN">15000JPY − 500USD a PEN</button>
+          <button data-calc="300JPY x 5000 a USD">300JPY × 5000 a USD</button>
+          <button data-calc="(1200PEN + 80USD) / 3 a PEN">(1200PEN + 80USD) / 3</button>
+        </div>
+        <p class="help small">Puedes sumar (+), restar (−), multiplicar (x o *) y dividir (/) montos en distintas monedas. Escribe "a PEN" al final o elige la moneda de destino.</p>
+      </div>
+
+      <p class="help">Cuánto vale cada moneda en <b id="fxBase"></b> y cómo cambió. Así ves si el dinero de una cuenta perdió valor.</p>
+      <div class="symbar" id="fxRange"></div>
+      <div class="help small" id="fxStatus"></div>
+      <div class="fx-card" id="fxCompare">
+        <div class="fx-head"><b>Comparar</b><span class="sub">toca para agregar o quitar</span></div>
+        <div class="cmp-pick" id="cmpPick"></div>
+        <div id="cmpChart"></div>
+      </div>
+      <div id="fxCards"></div>
+
+      <div class="card" style="margin-top:16px">
+        <h3>Mis monedas</h3>
+        <p class="help small">Aparecen como botones al escribir (ordenadas por la que usaste más recientemente) y en los gráficos de arriba. Puedes agregar cualquiera de las +200 monedas del servicio de tasas, incluidas cripto como <b>USDT</b>, <b>BTC</b> o <b>ETH</b>.</p>
+        <div class="cur-chips" id="curChips"></div>
+        <div class="row-add">
+          <input type="text" id="newCur" list="curList" maxlength="40" placeholder="Busca: EUR, MXN, USDT, BTC…" autocomplete="off">
+          <button id="btnAddCur">Agregar</button>
+        </div>
+        <datalist id="curList"></datalist>
+      </div>
+    </section>
+
+    <!-- ===== AJUSTES ===== -->
+    <section class="view" id="view-ajustes">
+      <h2 class="view-title">Ajustes</h2>
+      <div class="card">
+        <label>Moneda cuando no pones ninguna
+          <select id="setDefaultCur"></select>
+        </label>
+        <label>Ver totales e historial en
+          <select id="setDisplayCur"></select>
+        </label>
+        <label>Tasa manual (soles por 1 USD), se usa si no hay internet
+          <input type="number" step="0.01" id="setManualRate">
+        </label>
+        <div class="rate-status" id="rateStatus"></div>
+        <button id="btnRates">Actualizar tasas</button>
+      </div>
+      <div class="card">
+        <h3>Sonido y animaciones</h3>
+        <label class="check"><input type="checkbox" id="setSound"> Sonidos</label>
+        <label>Volumen
+          <input type="range" id="setVolume" min="0.05" max="1" step="0.05">
+        </label>
+        <label class="check"><input type="checkbox" id="setAnim"> Animaciones (y confeti al lograr metas)</label>
+      </div>
+      <div class="card">
+        <h3>Formato</h3>
+        <p class="help">Nombre, luego <b>tipo · MONEDA · monto · prefijo de cuenta</b>, todo junto:</p>
+        <table class="legend">
+          <tr><td><b class="t-gasto">-</b> Gasto</td><td><code>Pinceles -PEN50B</code></td></tr>
+          <tr><td><b class="t-ingreso">+</b> Ingreso</td><td><code>Comisión Ana +USD120B</code></td></tr>
+          <tr><td><b class="t-deuda">%</b> Debo</td><td><code>Le debo a Luis %PEN30</code></td></tr>
+          <tr><td><b class="t-medeben">&amp;</b> Me deben</td><td><code>Ana me debe &amp;PEN15</code></td></tr>
+          <tr><td><b class="t-encargo">#</b> Encargo</td><td><code>Fondo de Marco #USD200V</code></td></tr>
+          <tr><td><b class="t-transfer">&gt;</b> Transferencia</td><td><code>PayPal a BCP &gt;USD100P PEN360B</code><br>lo que salió y de qué cuenta, espacio, lo que llegó y a qué cuenta</td></tr>
+        </table>
+        <p class="help small">La moneda va en MAYÚSCULAS. El prefijo de cuenta es opcional. No hace falta escribir los símbolos: usa los botones de abajo.</p>
+      </div>
+      <div class="card debug">
+        <h3>🧪 Pruebas (debug)</h3>
+        <p class="help small">Crea meses de ejemplo anteriores con gastos e ingresos inventados, para probar el Historial y las comparaciones. No tocan tus cuentas ni el mes actual. Bórralos cuando quieras.</p>
+        <div class="row-add">
+          <button id="btnTestMonth">Agregar mes de prueba</button>
+          <button id="btnTestClear">Borrar meses de prueba</button>
+        </div>
+        <div class="help small" id="testInfo"></div>
+      </div>
+      <div class="card">
+        <h3>Respaldo</h3>
+        <button id="btnExport">Exportar copia (.json)</button>
+        <label class="file-btn">Importar copia
+          <input type="file" id="fileImport" accept="application/json,.json">
+        </label>
+        <p class="help small">La copia incluye las notas de Bancos sin cifrar: guárdala en un lugar seguro.</p>
+      </div>
+    </section>
+  </main>
+
+  <nav class="tabs" id="tabs">
+    <button data-view="mes" class="active"><span>✎</span>Mes</button>
+    <button data-view="compromisos"><span>⇄</span>Compromisos</button>
+    <button data-view="metas"><span>◎</span>Metas</button>
+    <button data-view="proyectos"><span>▤</span>Proyectos</button>
+    <button data-view="monedas"><span>¤</span>Monedas</button>
+    <button data-view="bancos"><span>▣</span>Bancos</button>
+  </nav>
+
+  <script src="app.js"></script>
+</body>
+</html>
